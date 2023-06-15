@@ -1,0 +1,63 @@
+---
+title: 'NFL Team QB EPA: 2022 vs 2023 (click on side to advance)'
+author: "Navin Sharma"
+date: "2023-06-15"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Comparing NFL teams in 2022 vs 2023
+This analysis looks at the change in Expected Points Added (EPA) for NFL teams for their actual performance in 2022 versus expected performance in 2023 based on current rosters
+
+(Please click to advance the slide)
+
+```{r echo=TRUE,results=FALSE,include=FALSE}
+library(dplyr)
+library(plotly)
+library(nflreadr)
+library(tidyr)
+
+playerData <- load_player_stats(2022)
+
+
+# get 2022 epa for QBs
+qb_epa_2022 <- playerData %>% 
+  filter(season_type=="REG",position=="QB") %>% 
+  select(player_name,recent_team,passing_epa,rushing_epa) %>% 
+  mutate(across(everything(), replace_na, 0)) %>% 
+  group_by(player_name,recent_team) %>%
+  summarize(total_epa=sum(passing_epa+rushing_epa)) %>%
+  arrange(desc(total_epa))
+
+# read updated file with 2023 data
+qb_list_2023 <- read.csv("qbs.csv")
+
+# merge 2022 and 2023
+merge(qb_epa_2022,qb_list_2023, by = "player_name")
+
+# get the 2023 qb epa by team
+data2023 <- merge(qb_epa_2022,qb_list_2023, by = "player_name") %>% 
+  group_by(recent_team.y) %>%
+  summarize(total_epa=sum(total_epa))
+
+
+# get the 2022 qb epa by team
+data2022 <- qb_epa_2022 %>% group_by(recent_team) %>% summarize(total_epa=sum(total_epa))
+
+combined <- merge(data2022,data2023,by.x="recent_team",by.y="recent_team.y")
+combined <- combined %>%
+  mutate(change=ifelse(total_epa.x<total_epa.y,"Higher","Lower / No Change"))
+```
+
+## QB EPA in 2022 vs 2023
+```{r warning=FALSE,echo=FALSE}
+plot_ly(combined, x = ~total_epa.x, y = ~total_epa.y, text=~recent_team, 
+        type="scatter", mode="markers",color=~change,size=50) %>%
+  layout(title = 'QB EPA 2022 vs 2023', 
+         xaxis = list(title = '2022 EPA'), 
+         yaxis = list(title = '2023 EPA'),
+         legend = list(title=list(text='<b>Change</b>')))
+```
